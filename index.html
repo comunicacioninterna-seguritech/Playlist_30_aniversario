@@ -525,6 +525,84 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     renderList();
     loadEpisode(0, false);
     setVisualMode(); // arranca en audio
+
+
+
+
+// ===================== ANALYTICS (GTM/GA4) =====================
+window.dataLayer = window.dataLayer || [];
+
+// Función para obtener título del episodio actual
+function getEpisodeTitle() {
+  try {
+    return (EPISODES && EPISODES[currentIndex] && EPISODES[currentIndex].title) || '(sin título)';
+  } catch (_) {
+    return '(sin título)';
+  }
+}
+
+// Push simplificado: play, progress, complete
+function pushMediaEvent(evt, extra = {}) {
+  window.dataLayer.push({
+    event: evt, // media_play | media_progress | media_complete
+    media_title: getEpisodeTitle(),
+    ...extra
+  });
+}
+
+// Hitos de progreso
+const PROGRESS_MILESTONES = [10, 25, 50, 75, 90, 100];
+let progressFired = new Set();
+
+function resetProgressMilestones() {
+  progressFired = new Set();
+}
+function safePercent(mediaEl) {
+  const dur = Math.floor(mediaEl?.duration || 0);
+  if (!dur) return 0;
+  const cur = Math.floor(mediaEl.currentTime || 0);
+  return Math.min(100, Math.floor((cur / dur) * 100));
+}
+function maybeFireProgress(mediaEl) {
+  const pct = safePercent(mediaEl);
+  for (const mark of PROGRESS_MILESTONES) {
+    if (pct >= mark && !progressFired.has(mark)) {
+      progressFired.add(mark);
+      pushMediaEvent('media_progress', { progress_percent: mark });
+      break;
+    }
+  }
+}
+
+// Enganchar tracking a video/audio
+function attachMediaTracking() {
+  const mediaList = [videoEl, audioEl].filter(Boolean);
+  mediaList.forEach(m => {
+    m.addEventListener('play', () => pushMediaEvent('media_play'));
+    m.addEventListener('timeupdate', () => maybeFireProgress(m));
+    m.addEventListener('ended', () => {
+      if (!progressFired.has(100)) {
+        pushMediaEvent('media_progress', { progress_percent: 100 });
+        progressFired.add(100);
+      }
+      pushMediaEvent('media_complete', { progress_percent: 100 });
+    });
+  });
+}
+
+// Reset milestones cuando cambias de episodio
+const origLoadEpisode = loadEpisode;
+loadEpisode = function(i, autoplay = false) {
+  resetProgressMilestones();
+  return origLoadEpisode(i, autoplay);
+};
+
+// Inicializar tracking
+attachMediaTracking();
+
+
+
+
   </script>
 </body>
 </html>
