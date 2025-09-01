@@ -58,6 +58,20 @@
     .btn svg{width:100%;height:100%}
 
     @media (min-width:901px){#listPanel{max-height:80vh}}
+
+    /* ===== MODO TEATRO (para cuando esté embebido o el usuario quiera expandir en embed) ===== */
+    .app.theater .grid{ grid-template-columns: 1fr; }
+    .app.theater #listPanel{ order: 2; }
+    .app.theater .player{ order: 1; align-items: stretch; }
+
+    .app.theater .videoBox,
+    .app.theater .cover,
+    .app.theater .timeline{
+      width: 100% !important;
+      max-width: 100%;
+    }
+
+    .app.theater .videoBox{ border-radius: 12px; }
   </style>
 </head>
 <body>
@@ -162,6 +176,40 @@
     const timeEl      = document.getElementById('time');
     const toggleAV    = document.getElementById('toggleAV');
     const playerPanel = document.querySelector('.panel.player');
+
+    // Elemento raíz para alternar modo "theater"
+    const appEl = document.querySelector('.app');
+    // Estado de modo "theater" (vista expandida en embebido)
+    let theaterMode = false;
+    // Detecta si la página está embebida en un iframe (por ejemplo, Google Sites)
+    function isEmbedded(){
+      try { return window.self !== window.top; }
+      catch(e){ return true; }
+    }
+    // Alterna la clase .theater en el contenedor y ajusta el estado del botón
+    function setTheater(on){
+      theaterMode = !!on;
+      appEl.classList.toggle('theater', theaterMode);
+      btnFS.setAttribute('aria-pressed', theaterMode ? 'true' : 'false');
+      theaterMode ? setExitFSIcon() : setEnterFSIcon();
+      // Si entramos a modo teatro y hay video, aseguramos estar en modo video
+      if (theaterMode && hasVideo()){
+        visualMode = 'video';
+        setVisualMode();
+      }
+    }
+    // Actualiza la etiqueta del botón de pantalla completa según el contexto
+    function updateFSLabel(){
+      if (isEmbedded()){
+        btnFS.title = theaterMode ? 'Salir de vista expandida' : 'Expandir dentro del embed';
+      } else {
+        btnFS.title = 'Pantalla completa';
+      }
+    }
+    document.addEventListener('DOMContentLoaded', updateFSLabel);
+    ['click','fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(evt=>{
+      document.addEventListener(evt, updateFSLabel, true);
+    });
 
     let currentIndex = 0;
     let scrubbing    = false;
@@ -385,7 +433,14 @@
     }
     setEnterFSIcon();
     btnFS.addEventListener('click', ()=>{
-      if (!hasVideo() || visualMode!=='video') return;
+      if (!hasVideo()) return;
+      // En páginas embebidas, alterna la vista "theater" en lugar de usar pantalla completa nativa
+      if (isEmbedded()){
+        setTheater(!theaterMode);
+        return;
+      }
+      // Si no estamos en modo video, lo activamos antes de pedir pantalla completa
+      if (visualMode !== 'video'){ visualMode = 'video'; setVisualMode(); }
       if (!isFullscreen()) requestFS(videoEl);
       else exitFS();
     });
@@ -452,3 +507,4 @@
   </script>
 </body>
 </html>
+
