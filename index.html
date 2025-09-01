@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Playlist - Webinars Aniversario 30</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#004E94; --card:#ffffff; --text:#111827; --muted:#6b7280;
+      --accent:#004E94; --accent-hover:#0060b8; --border:#e5e7eb; --btn-size:72px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:'Montserrat',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .app{max-width:1000px;margin:0 auto;padding:20px}
+    .title{color:#fff;margin:0 0 14px;font-weight:700;letter-spacing:.2px;display:none!important}
+
+    .grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:stretch}
+    @media (max-width:900px){.grid{grid-template-columns:1fr} #listPanel{order:2}.player{order:1}}
+
+    .panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    #listPanel{display:flex}
+    .list{display:flex;flex-direction:column;padding:8px 12px 8px 8px;background:#fff;overflow:auto;overscroll-behavior:contain;height:100%;scrollbar-gutter:stable both-edges;background-clip:padding-box}
+    .item{display:grid;grid-template-columns:60px 1fr auto;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;background:#fff;text-align:left;margin:0;border:0;box-shadow:none;appearance:none;outline:none;width:100%;border-radius:10px}
+    .item + .item{margin-top:6px}
+    .item:last-child{border-bottom:none}
+    .item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+    .thumb{width:60px;height:60px;border-radius:10px;object-fit:cover;border:1px solid #eef2f7}
+    .name{font-size:14px;font-weight:600}
+    .desc,.dur{font-size:12px;color:var(--muted)}
+    .item.active{background:#f7fbff}
+    .item:hover{background:#f3f8ff}
+    .list::-webkit-scrollbar{width:12px}
+    .list::-webkit-scrollbar-thumb{background:#cfd8e3;border-radius:10px;border:3px solid #fff}
+    .list{scrollbar-width:thin;scrollbar-color:#cfd8e3 transparent}
+
+    .player{padding:18px;display:flex;flex-direction:column;align-items:center}
+    .cover{width:min(360px,92%);aspect-ratio:1/1;object-fit:cover;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.15);border:1px solid #eef2f7;margin-bottom:12px}
+    .videoBox{width:min(360px,92%);aspect-ratio:16/9;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.15);border:1px solid #eef2f7;margin-bottom:12px;background:#000;overflow:hidden}
+    .videoBox video{width:100%;height:100%;object-fit:cover;display:block}
+    .h2{margin:6px 0 2px;font-size:18px;font-weight:700;text-align:center}
+    .status{font-size:12px;color:#6ea8ff;margin-bottom:6px}
+
+    .avToggle{margin:6px 0 10px;display:flex;gap:8px;align-items:center;justify-content:center}
+    .switch{appearance:none;border:1px solid var(--border);background:#f3f4f6;color:#111;cursor:pointer;padding:8px 12px;border-radius:999px;font-weight:600;transition:background .15s ease, transform .08s ease}
+    .switch:hover{transform:translateY(-1px);background:#e8eef9}
+    .switch:disabled{opacity:.5;cursor:not-allowed}
+
+    .timeline{width:min(360px,92%);display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0 12px}
+    .time{font-size:14px;color:var(--muted);text-align:center;min-width:0}
+    input[type="range"]{accent-color:var(--accent);width:100%}
+
+    .controls{display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap}
+    .btn{appearance:none;border:0;background:transparent;cursor:pointer;padding:0;border-radius:14px;outline-offset:4px;width:var(--btn-size);height:var(--btn-size);transition:transform .08s ease, filter .15s ease;display:inline-grid;place-items:center}
+    .btn:focus-visible{outline:2px solid var(--accent)}
+    .btn:hover{transform:translateY(-1px);filter:drop-shadow(0 4px 10px rgba(0,0,0,.15))}
+    .btn svg{width:100%;height:100%}
+
+    @media (min-width:901px){#listPanel{max-height:80vh}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1 class="title">Podcast – Selecciona un episodio</h1>
+    <div class="grid">
+      <!-- Lista -->
+      <aside class="panel" id="listPanel" aria-label="Lista de episodios">
+        <div class="list" id="episodeList"></div>
+      </aside>
+
+      <!-- Reproductor -->
+      <section class="panel player" aria-label="Reproductor">
+        <!-- Vista portada (modo audio) -->
+        <img id="cover" class="cover" src="Introduccion_a_ISSABEL.png" alt="Portada">
+
+        <!-- CUADRO DE VIDEO (solo presentación). La fuente real es videoEl -->
+        <div id="videoBox" class="videoBox" style="display:none;">
+          <video id="videoEl" preload="metadata" playsinline></video>
+        </div>
+
+        <!-- FUENTE SOLO-AUDIO -->
+        <audio id="audioEl" preload="auto"></audio>
+
+        <div class="h2" id="epTitle">–</div>
+        <div class="status" id="status">Sin iniciar</div>
+
+        <!-- Toggle Audio/Video (se desactiva si no hay .mp4) -->
+        <div class="avToggle">
+          <button id="toggleAV" class="switch" type="button" aria-pressed="false" aria-label="Cambiar a video" title="Cambiar a video">Ver video</button>
+        </div>
+
+        <div class="timeline">
+          <span id="time" class="time" aria-live="polite">00:00 / 00:00</span>
+          <input type="range" id="progress" value="0" min="0" step="1" aria-label="Barra de progreso">
+        </div>
+
+        <div class="controls">
+          <button id="btnBack" class="btn" aria-label="Retroceder 10 segundos" title="Retroceder 10 s">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+              <defs><linearGradient id="g" x1="0" y="0" x2="1" y="1"><stop offset="0" stop-color="#0060b8"/><stop offset="1" stop-color="#004E94"/></linearGradient></defs>
+              <circle cx="38" cy="38" r="34" fill="url(#g)"/>
+              <path d="M45 27v22l-16-11z" fill="#fff" opacity=".95"/>
+              <path d="M33 27v22l-16-11z" fill="#fff" opacity=".95"/>
+            </svg>
+          </button>
+
+          <button id="btnPlay" class="btn" aria-label="Reproducir o Pausar" title="Reproducir/Pausar"></button>
+
+          <button id="btnFwd" class="btn" aria-label="Avanzar 10 segundos" title="Avanzar 10 s">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+              <defs><linearGradient id="g3" x1="0" y="0" x2="1" y="1"><stop offset="0" stop-color="#0060b8"/><stop offset="1" stop-color="#004E94"/></linearGradient></defs>
+              <circle cx="38" cy="38" r="34" fill="url(#g3)"/>
+              <path d="M31 27v22l16-11z" fill="#fff" opacity=".95"/>
+              <path d="M43 27v22l16-11z" fill="#fff" opacity=".95"/>
+            </svg>
+          </button>
+
+          <!-- PANTALLA COMPLETA (solo visible en modo video y si hay video) -->
+          <button id="btnFS" class="btn" aria-label="Pantalla completa" title="Pantalla completa" style="display:none;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+              <defs><linearGradient id="gfs" x1="0" y="0" x2="1" y="1"><stop offset="0" stop-color="#0060b8"/><stop offset="1" stop-color="#004E94"/></linearGradient></defs>
+              <circle cx="38" cy="38" r="34" fill="url(#gfs)"/>
+              <path d="M28 33v-7h7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+              <path d="M48 33v-7h-7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+              <path d="M28 43v7h7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+              <path d="M48 43v7h-7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // ========= EPISODIOS =========
+    // Si hay "video", se usa SIEMPRE el <video> (mantiene el tiempo al alternar audio/video).
+    // Si NO hay "video", se usa <audio> y se fuerza modo "audio".
+    const EPISODES = [
+      { title: "Drones",              video:"DRONES.mp4",        src:"",        cover:"1.png", desc:"Mauricio Kleinburg - Director de Integración Tecnológica" },
+      { title: "SAIMOINTECH",         video:"SAIMONTECH.mp4",     src:"",     cover:"2.png",  desc:"Raúl Dávila y su equipo - Director de Soporte Operativo" },
+      { title: "IA y Ciberseguridad", video:"IA_CIBERSEGURIDAD.mp4",      src:"",      cover:"3.png",  desc:"Jesús Guevara - Gerente de Ciberseguridad" },
+      { title: "Proyecto Centinela",  video:"PROYECTO_CENTINELA.mp4",     src:"",     cover:"4.png",  desc:"Ángel Gutiérrez - Director Regional de Operaciones" },
+      { title: "¿Quiénes somos y qué es CAD Saimon?",           video:"CAD.mp4",                                       src:"",             cover:"5.png",  desc:"Oscar Santiago - Dirección de Tecnologia | Product Specialist" },
+
+    ];
+
+    // ========= UI / ESTADO =========
+    const list        = document.getElementById('episodeList');
+    const listPanel   = document.getElementById('listPanel');
+    const videoEl     = document.getElementById('videoEl');
+    const audioEl     = document.getElementById('audioEl');
+    const videoBox    = document.getElementById('videoBox');
+    const cover       = document.getElementById('cover');
+    const status      = document.getElementById('status');
+    const epTitle     = document.getElementById('epTitle');
+    const btnPlay     = document.getElementById('btnPlay');
+    const btnBack     = document.getElementById('btnBack');
+    const btnFwd      = document.getElementById('btnFwd');
+    const btnFS       = document.getElementById('btnFS');
+    const progress    = document.getElementById('progress');
+    const timeEl      = document.getElementById('time');
+    const toggleAV    = document.getElementById('toggleAV');
+    const playerPanel = document.querySelector('.panel.player');
+
+    let currentIndex = 0;
+    let scrubbing    = false;
+    let visualMode   = 'audio'; // 'audio' | 'video'
+
+    function hasVideo(idx = currentIndex){
+      const v = EPISODES[idx]?.video;
+      return !!(v && v.trim() !== "");
+    }
+
+    function activeMedia(){
+      return hasVideo() ? videoEl : audioEl;
+    }
+
+    // Render lista
+    function renderList(){
+      list.innerHTML = '';
+      EPISODES.forEach((ep, i) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'item' + (i===currentIndex ? ' active' : '');
+        item.setAttribute('aria-label', 'Reproducir ' + ep.title);
+        item.innerHTML = `
+          <img class="thumb" src="${ep.cover}" alt="Portada">
+          <div>
+            <div class="name">${ep.title}</div>
+            <div class="desc">${ep.desc||''}</div>
+          </div>
+          <div class="dur"></div>`;
+        item.addEventListener('click', ()=>loadEpisode(i, true));
+        list.appendChild(item);
+      });
+    }
+
+    // Habilitar/deshabilitar toggle y fullscreen según disponibilidad de video
+    function updateAVAvailability(){
+      const canVideo = hasVideo();
+      toggleAV.disabled = !canVideo;
+      toggleAV.title = canVideo ? 'Cambiar a video' : 'Episodio solo con audio';
+      if (!canVideo && visualMode === 'video'){
+        visualMode = 'audio';
+      }
+      setVisualMode();
+    }
+
+    // Presentación visual
+    function setVisualMode(){
+      const canVideo = hasVideo();
+      const showVideoBox = (visualMode === 'video') && canVideo;
+
+      // Mostrar FS solo si estamos en video y hay video
+      btnFS.style.display = showVideoBox ? '' : 'none';
+
+      // Portada vs cuadro de video
+      if (showVideoBox){
+        cover.style.display = 'none';
+        videoBox.style.display = '';
+        toggleAV.textContent = 'Cambiar a audio';
+        toggleAV.setAttribute('aria-pressed','true');
+        toggleAV.setAttribute('aria-label','Cambiar a audio');
+      } else {
+        cover.style.display = '';
+        videoBox.style.display = 'none';
+        toggleAV.textContent = 'Cambiar a video';
+        toggleAV.setAttribute('aria-pressed','false');
+        toggleAV.setAttribute('aria-label','Cambiar a video');
+      }
+      syncListHeight();
+    }
+
+    // Cargar episodio
+    function loadEpisode(i, autoplay=false){
+      currentIndex = i;
+      [...list.children].forEach((c, idx) => c.classList.toggle('active', idx===i));
+      const ep = EPISODES[i];
+
+      cover.src = ep.cover; cover.alt = 'Portada – ' + ep.title;
+      epTitle.textContent = ep.title; status.textContent = 'Listo';
+
+      // Si hay video, usamos SIEMPRE el <video> como fuente
+      if (hasVideo(i)){
+        videoEl.src = ep.video;
+        videoEl.poster = ep.cover || '';
+        audioEl.removeAttribute('src'); // no usamos <audio> en episodios con video
+      } else {
+        // Solo audio
+        audioEl.src = ep.src || '';
+        videoEl.removeAttribute('src');
+        videoEl.removeAttribute('poster');
+        visualMode = 'audio'; // fuerza a audio
+      }
+
+      // Reset UI
+      setPlayIcon();
+      progress.value = 0; timeEl.textContent = '00:00 / 00:00';
+
+      updateAVAvailability();
+
+      if (autoplay){
+        const p = activeMedia().play(); if (p && p.catch) p.catch(()=>{});
+      }
+      syncListHeight();
+    }
+
+    // Toggle presentación (NO cambia la fuente ni el tiempo)
+    toggleAV.addEventListener('click', ()=>{
+      if (toggleAV.disabled) return;
+      visualMode = (visualMode === 'audio') ? 'video' : 'audio';
+      setVisualMode();
+    });
+
+    // Controles sobre el medio activo
+    btnPlay.addEventListener('click', ()=> {
+      const m = activeMedia();
+      m.paused ? m.play() : m.pause();
+    });
+    btnBack.addEventListener('click', ()=> {
+      const m = activeMedia();
+      m.currentTime = Math.max(0, (m.currentTime||0) - 10);
+    });
+    btnFwd .addEventListener('click', ()=> {
+      const m = activeMedia();
+      m.currentTime = Math.min((m.duration||1), (m.currentTime||0) + 10);
+    });
+
+    // Atajos
+    window.addEventListener('keydown', (e)=>{
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const k = e.key.toLowerCase();
+      const m = activeMedia();
+      if (e.code === 'Space' || k === 'k'){ e.preventDefault(); m.paused ? m.play() : m.pause(); }
+      if (k === 'j'){ m.currentTime = Math.max(0, (m.currentTime||0) - 10); }
+      if (k === 'l'){ m.currentTime = Math.min((m.duration||1), (m.currentTime||0) + 10); }
+      if (k === 'f' && hasVideo() && visualMode === 'video'){ e.preventDefault(); btnFS.click(); }
+    });
+
+    // ===== Eventos de ambos medios (solo actualizan UI si son el activo) =====
+    [videoEl, audioEl].forEach(m => {
+      m.addEventListener('loadedmetadata', ()=>{
+        if (m !== activeMedia()) return;
+        const dur = Math.floor(m.duration || 0);
+        progress.max = dur>0 ? dur : 0;
+        progress.value = Math.floor(m.currentTime || 0);
+        timeEl.textContent = `${formatTime(progress.value)} / ${formatTime(dur)}`;
+        syncListHeight();
+      });
+      m.addEventListener('durationchange', ()=>{
+        if (m !== activeMedia()) return;
+        const dur = Math.floor(m.duration || 0);
+        if (dur>0){
+          progress.max = dur;
+          timeEl.textContent = `${formatTime(Math.floor(m.currentTime||0))} / ${formatTime(dur)}`;
+        }
+        syncListHeight();
+      });
+      m.addEventListener('timeupdate', ()=>{
+        if (m !== activeMedia()) return;
+        const cur = Math.floor(m.currentTime || 0);
+        const dur = Math.floor(m.duration || 0);
+        if (!scrubbing) progress.value = cur;
+        timeEl.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+      });
+      m.addEventListener('play',  ()=>{ if (m===activeMedia()){ status.textContent = 'Reproduciendo'; setPauseIcon(); }});
+      m.addEventListener('pause', ()=>{ if (m===activeMedia()){ status.textContent = 'En pausa';     setPlayIcon();  }});
+      m.addEventListener('ended', ()=>{
+        if (m!==activeMedia()) return;
+        status.textContent = 'Terminado'; setPlayIcon();
+        if (currentIndex < EPISODES.length-1) loadEpisode(currentIndex+1, true);
+      });
+    });
+
+    // Scrub
+    progress.addEventListener('pointerdown', ()=>{ scrubbing = true; });
+    window.addEventListener('pointerup', ()=>{ scrubbing = false; });
+    progress.addEventListener('input', ()=>{
+      const m = activeMedia();
+      m.currentTime = progress.value;
+      const cur = Math.floor(progress.value);
+      const dur = Math.floor(m.duration || 0);
+      timeEl.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+    });
+
+    // ===== Pantalla completa (solo video) =====
+    function setEnterFSIcon(){
+      btnFS.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+          <defs><linearGradient id="gfs1" x1="0" y="0" x2="1" y="1">
+            <stop offset="0" stop-color="#0060b8"/><stop offset="1" stop-color="#004E94"/>
+          </linearGradient></defs>
+          <circle cx="38" cy="38" r="34" fill="url(#gfs1)"/>
+          <path d="M28 33v-7h7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M48 33v-7h-7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M28 43v7h7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M48 43v7h-7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        </svg>`;
+    }
+    function setExitFSIcon(){
+      btnFS.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+          <defs><linearGradient id="gfs2" x1="0" y="0" x2="1" y="1">
+            <stop offset="0" stop-color="#004E94"/><stop offset="1" stop-color="#0060b8"/>
+          </linearGradient></defs>
+          <circle cx="38" cy="38" r="34" fill="url(#gfs2)"/>
+          <path d="M35 28h-7v7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M41 28h7v7"  fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M35 48h-7v-7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M41 48h7v-7"  fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        </svg>`;
+    }
+    function isFullscreen(){ return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null; }
+    function requestFS(el){
+      if (el.requestFullscreen) return el.requestFullscreen();
+      if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+      if (el.msRequestFullscreen) return el.msRequestFullscreen();
+      if (el.webkitEnterFullscreen) return el.webkitEnterFullscreen(); // iOS Safari
+    }
+    function exitFS(){
+      if (document.exitFullscreen) return document.exitFullscreen();
+      if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+      if (document.msExitFullscreen) return document.msExitFullscreen();
+    }
+    setEnterFSIcon();
+    btnFS.addEventListener('click', ()=>{
+      if (!hasVideo() || visualMode!=='video') return;
+      if (!isFullscreen()) requestFS(videoEl);
+      else exitFS();
+    });
+    videoEl.addEventListener('dblclick', ()=> btnFS.click());
+    ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(evt=>{
+      document.addEventListener(evt, ()=>{
+        const active = !!isFullscreen();
+        btnFS.setAttribute('aria-pressed', active ? 'true' : 'false');
+        active ? setExitFSIcon() : setEnterFSIcon();
+      });
+    });
+    videoEl.addEventListener('webkitendfullscreen', ()=>{
+      btnFS.setAttribute('aria-pressed','false');
+      setEnterFSIcon();
+    });
+
+    // Iconos Play/Pause
+    function setPauseIcon(){
+      btnPlay.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+          <defs><linearGradient id="g4" x1="0" y="0" x2="1" y="1">
+            <stop offset="0" stop-color="#004E94"/><stop offset="1" stop-color="#0060b8"/>
+          </linearGradient></defs>
+          <circle cx="38" cy="38" r="34" fill="url(#g4)"/>
+          <rect x="29" y="24" width="6" height="28" rx="2" fill="#fff"/>
+          <rect x="41" y="24" width="6" height="28" rx="2" fill="#fff"/>
+          <circle cx="38" cy="38" r="34" fill="none" stroke="#ffffff55" stroke-width="2"/>
+        </svg>`;
+    }
+    function setPlayIcon(){
+      btnPlay.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 76">
+          <defs><linearGradient id="g2" x1="0" y="0" x2="1" y="1">
+            <stop offset="0" stop-color="#004E94"/><stop offset="1" stop-color="#0060b8"/>
+          </linearGradient></defs>
+          <circle cx="38" cy="38" r="34" fill="url(#g2)"/>
+          <path d="M31 25l22 13-22 13z" fill="#fff" opacity=".97"/>
+          <circle cx="38" cy="38" r="34" fill="none" stroke="#ffffff55" stroke-width="2"/>
+        </svg>`;
+    }
+
+    function formatTime(s){
+      if (!Number.isFinite(s)) return '00:00';
+      const m = Math.floor(s/60), ss = Math.floor(s%60);
+      return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    }
+
+    // Altura lista = altura player
+    function syncListHeight(){
+      const twoCol = window.matchMedia('(min-width: 901px)').matches;
+      if (!twoCol) { listPanel.style.maxHeight = ''; return; }
+      const h = playerPanel.getBoundingClientRect().height;
+      if (h>0) listPanel.style.maxHeight = h + 'px';
+    }
+    window.addEventListener('load', syncListHeight);
+    document.addEventListener('DOMContentLoaded', syncListHeight);
+    window.addEventListener('resize', syncListHeight);
+    if ('ResizeObserver' in window) new ResizeObserver(syncListHeight).observe(playerPanel);
+
+    // Init
+    renderList();
+    loadEpisode(0, false);
+    setVisualMode(); // arranca en audio
+  </script>
+</body>
+</html>
